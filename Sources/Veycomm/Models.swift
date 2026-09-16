@@ -2,7 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 
 enum ShortcutAction: String, Codable, CaseIterable, Identifiable {
-    case application, url, shell, text
+    case application, url, shell, text, translate
 
     var id: String { rawValue }
     var title: String {
@@ -11,6 +11,7 @@ enum ShortcutAction: String, Codable, CaseIterable, Identifiable {
         case .url: "打开链接或文件"
         case .shell: "执行 Shell 脚本"
         case .text: "粘贴文本"
+        case .translate: "划词翻译"
         }
     }
     var placeholder: String {
@@ -19,6 +20,7 @@ enum ShortcutAction: String, Codable, CaseIterable, Identifiable {
         case .url: "https://example.com 或 /Users/name/file"
         case .shell: "open -a Safari"
         case .text: "要输入的文字"
+        case .translate: "无需填写"
         }
     }
 }

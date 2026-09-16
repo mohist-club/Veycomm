@@ -5,6 +5,7 @@ struct SettingsView: View {
     @EnvironmentObject private var store: ShortcutStore
     @State private var selection: UUID?
     @State private var showingEditor = false
+    @State private var showingTranslationSettings = false
     @State private var draft = ShortcutItem.example
 
     var body: some View {
@@ -18,6 +19,7 @@ struct SettingsView: View {
             .navigationTitle("快捷键")
             .toolbar {
                 Button { draft = ShortcutItem.example; showingEditor = true } label: { Image(systemName: "plus") }
+                Button { showingTranslationSettings = true } label: { Image(systemName: "globe") }
                 Button { if let selected = store.items.first(where: { $0.id == selection }) { store.delete(selected); selection = nil } } label: { Image(systemName: "minus") }
                     .disabled(selection == nil)
             }
@@ -34,6 +36,7 @@ struct SettingsView: View {
         }
         .frame(minWidth: 720, minHeight: 440)
         .sheet(isPresented: $showingEditor) { ShortcutEditor(item: $draft) { saved in store.save(saved); selection = saved.id } }
+        .sheet(isPresented: $showingTranslationSettings) { TranslationSettingsEditor(settings: store.translationSettings) }
         .alert("Veycomm", isPresented: Binding(get: { store.lastError != nil }, set: { if !$0 { store.lastError = nil } })) { Button("好", role: .cancel) {} } message: { Text(store.lastError ?? "") }
         .alert("登录启动", isPresented: Binding(get: { store.statusMessage != nil }, set: { if !$0 { store.statusMessage = nil } })) { Button("好", role: .cancel) {} } message: { Text(store.statusMessage ?? "") }
     }
@@ -62,12 +65,12 @@ private struct ShortcutEditor: View {
             Form {
                 TextField("名称", text: $item.name)
                 Picker("动作", selection: $item.action) { ForEach(ShortcutAction.allCases) { Text($0.title).tag($0) } }
-                payloadField
+                if item.action != .translate { payloadField }
                 HStack { Text("组合键"); Spacer(); KeyRecorder(shortcut: $item.shortcut, isRecording: $isRecording, onRecordingState: store.setHotKeyRecording) }
                 Toggle("已启用", isOn: $item.isEnabled)
             }
             if let warning { Label(warning, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }
-            HStack { Spacer(); Button("取消") { dismiss() }; Button("保存") { save() }.keyboardShortcut(.defaultAction).disabled(item.name.trimmingCharacters(in: .whitespaces).isEmpty || item.payload.isEmpty) }
+            HStack { Spacer(); Button("取消") { dismiss() }; Button("保存") { save() }.keyboardShortcut(.defaultAction).disabled(item.name.trimmingCharacters(in: .whitespaces).isEmpty || (item.action != .translate && item.payload.isEmpty)) }
         }.padding().frame(width: 500)
     }
     @ViewBuilder
@@ -85,6 +88,8 @@ private struct ShortcutEditor: View {
             }
         case .shell, .text:
             TextField(item.action.placeholder, text: $item.payload, axis: .vertical).lineLimit(2...4)
+        case .translate:
+            EmptyView()
         }
     }
     private func save() { if let conflict = store.conflict(for: item) { warning = "与“\(conflict.name)”使用相同快捷键"; return }; onSave(item); dismiss() }
@@ -106,6 +111,28 @@ private struct ShortcutEditor: View {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         if panel.runModal() == .OK, let url = panel.url { item.payload = url.path }
+    }
+}
+
+private struct TranslationSettingsEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var settings: TranslationSettings
+    @State private var key = ""
+    @State private var message: String?
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("翻译服务").font(.title2.bold())
+            Form {
+                Toggle("启用划词翻译", isOn: $settings.isEnabled)
+                Picker("当前服务", selection: $settings.provider) { ForEach(TranslationProvider.allCases) { Text($0.title).tag($0) } }
+                SecureField("API Key", text: $key).onAppear { key = settings.apiKey() }
+                if settings.provider == .openAI { TextField("模型", text: $settings.openAIModel) }
+                if settings.provider == .google { TextField("Google Project ID（v3 时需要）", text: $settings.googleProjectID) }
+            }
+            Text("一次只能启用一个服务。密钥只保存在本机 Keychain，不会进入配置文件。").font(.footnote).foregroundStyle(.secondary)
+            if let message { Text(message).foregroundStyle(.red) }
+            HStack { Spacer(); Button("完成") { do { try settings.saveAPIKey(key); dismiss() } catch { message = "无法保存密钥" } }.keyboardShortcut(.defaultAction) }
+        }.padding().frame(width: 480)
     }
 }
 
