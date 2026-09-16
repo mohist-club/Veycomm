@@ -68,6 +68,15 @@ func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {
     return result
 }
 
+func carbonModifiers(from flags: CGEventFlags) -> UInt32 {
+    var result: UInt32 = 0
+    if flags.contains(.maskCommand) { result |= UInt32(cmdKey) }
+    if flags.contains(.maskAlternate) { result |= UInt32(optionKey) }
+    if flags.contains(.maskControl) { result |= UInt32(controlKey) }
+    if flags.contains(.maskShift) { result |= UInt32(shiftKey) }
+    return result
+}
+
 struct ShortcutItem: Codable, Identifiable, Hashable {
     var id = UUID()
     var name: String

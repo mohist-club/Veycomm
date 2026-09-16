@@ -1,6 +1,7 @@
 import AppKit
 import Carbon.HIToolbox
 import ServiceManagement
+import ApplicationServices
 
 @MainActor
 final class ShortcutStore: ObservableObject {
@@ -18,6 +19,9 @@ final class ShortcutStore: ObservableObject {
         manager.onHotKey = { [weak self] id in
             guard let self, let item = self.items.first(where: { $0.id == id && $0.isEnabled }) else { return }
             self.perform(item)
+        }
+        manager.onAccessibilityRequired = { [weak self] in
+            self?.lastError = "若要覆盖已被其他应用占用的快捷键，请在“系统设置 → 隐私与安全性 → 辅助功能”中允许 ShortcutShelf。"
         }
         refreshHotKeys()
     }
@@ -122,9 +126,13 @@ private struct UserLaunchAgent {
 // Registration and the callback are serialized on that dispatcher.
 private final class GlobalHotKeyManager: @unchecked Sendable {
     var onHotKey: ((UUID) -> Void)?
+    var onAccessibilityRequired: (() -> Void)?
     private var refs: [EventHotKeyRef] = []
     private var ids: [UInt32: UUID] = [:]
+    private var shortcuts: [Shortcut: UUID] = [:]
     private var handler: EventHandlerRef?
+    private var eventTap: CFMachPort?
+    private var eventTapSource: CFRunLoopSource?
     private var nextID: UInt32 = 1
 
     init() {
@@ -137,9 +145,16 @@ private final class GlobalHotKeyManager: @unchecked Sendable {
             return noErr
         }, 1, [spec], Unmanaged.passUnretained(self).toOpaque(), &handler)
     }
-    deinit { refs.forEach { UnregisterEventHotKey($0) }; if let handler { RemoveEventHandler(handler) } }
+    deinit {
+        refs.forEach { UnregisterEventHotKey($0) }
+        if let eventTapSource { CFRunLoopRemoveSource(CFRunLoopGetMain(), eventTapSource, .commonModes) }
+        if let handler { RemoveEventHandler(handler) }
+    }
     func register(_ items: [ShortcutItem]) {
         refs.forEach { UnregisterEventHotKey($0) }; refs.removeAll(); ids.removeAll(); nextID = 1
+        shortcuts = Dictionary(uniqueKeysWithValues: items.map { ($0.shortcut, $0.id) })
+        if installEventTap() { return }
+        DispatchQueue.main.async { [weak self] in self?.onAccessibilityRequired?() }
         for item in items {
             let id = nextID; nextID += 1
             var ref: EventHotKeyRef?
@@ -148,5 +163,43 @@ private final class GlobalHotKeyManager: @unchecked Sendable {
                 refs.append(ref); ids[id] = item.id
             }
         }
+    }
+
+    private func installEventTap() -> Bool {
+        if eventTap != nil { return true }
+        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        let options = [promptKey: true] as CFDictionary
+        guard AXIsProcessTrustedWithOptions(options) else { return false }
+        let mask = CGEventMask(1) << CGEventType.keyDown.rawValue
+        guard let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: mask,
+            callback: { _, type, event, userInfo in
+                guard let userInfo else { return Unmanaged.passUnretained(event) }
+                let manager = Unmanaged<GlobalHotKeyManager>.fromOpaque(userInfo).takeUnretainedValue()
+                if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                    if let tap = manager.eventTap { CGEvent.tapEnable(tap: tap, enable: true) }
+                    return Unmanaged.passUnretained(event)
+                }
+                let shortcut = Shortcut(
+                    keyCode: UInt32(event.getIntegerValueField(.keyboardEventKeycode)),
+                    modifiers: carbonModifiers(from: event.flags)
+                )
+                if let uuid = manager.shortcuts[shortcut] {
+                    DispatchQueue.main.async { manager.onHotKey?(uuid) }
+                    return nil
+                }
+                return Unmanaged.passUnretained(event)
+            },
+            userInfo: Unmanaged.passUnretained(self).toOpaque()
+        ) else { return false }
+        eventTap = tap
+        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        eventTapSource = source
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+        return true
     }
 }

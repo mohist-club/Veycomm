@@ -28,8 +28,9 @@ if [[ -e "$output_dir" ]]; then
   exit 1
 fi
 
-mkdir -p "$output_dir/Contents/MacOS"
+mkdir -p "$output_dir/Contents/MacOS" "$output_dir/Contents/Resources"
 cp App/Info.plist "$output_dir/Contents/Info.plist"
+cp App/Assets/AppIcon.icns "$output_dir/Contents/Resources/AppIcon.icns"
 cp "$binary_dir/ShortcutShelf" "$output_dir/Contents/MacOS/ShortcutShelf"
 codesign --force --sign - "$output_dir"
 print "Created $output_dir"
