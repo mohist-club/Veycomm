@@ -18,7 +18,7 @@ final class TranslationSettings: ObservableObject {
     init() {
         provider = TranslationProvider(rawValue: UserDefaults.standard.string(forKey: "translation-provider") ?? "openAI") ?? .openAI
         isEnabled = UserDefaults.standard.bool(forKey: "translation-enabled")
-        openAIModel = UserDefaults.standard.string(forKey: "openai-model") ?? "gpt-4.1-mini"
+        openAIModel = UserDefaults.standard.string(forKey: "openai-model") ?? "gpt-4.1-nano"
         googleProjectID = UserDefaults.standard.string(forKey: "google-project") ?? ""
     }
     func apiKey() -> String { Keychain.value(for: "translation-\(provider.rawValue)") ?? "" }
@@ -71,8 +71,8 @@ enum Translator {
     }
     private static func openAI(_ text: String, _ target: String, _ key: String, _ model: String) async throws -> TranslationResult {
         var request = URLRequest(url: URL(string: "https://api.openai.com/v1/responses")!); request.httpMethod = "POST"; request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization"); request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let prompt = "Translate the following text to \(target). Return only the translation, preserving formatting. Text: \(text)"
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["model": model, "input": prompt])
+        let prompt = "Translate to \(target). Return only the translation; preserve formatting. Text: \(text)"
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["model": model, "input": prompt, "max_output_tokens": 256])
         let data = try await send(request); let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         guard let output = json?["output"] as? [[String: Any]], let content = output.first?["content"] as? [[String: Any]], let translated = content.first?["text"] as? String else { throw TranslationError.network }
         return TranslationResult(sourceLanguage: "自动检测", targetLanguage: target, translatedText: translated)
