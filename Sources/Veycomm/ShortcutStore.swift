@@ -22,9 +22,6 @@ final class ShortcutStore: ObservableObject {
             guard let self, let item = self.items.first(where: { $0.id == id && $0.isEnabled }) else { return }
             self.perform(item)
         }
-        manager.onAccessibilityRequired = { [weak self] in
-            self?.lastError = "若要覆盖已被其他应用占用的快捷键，请在“系统设置 → 隐私与安全性 → 辅助功能”中允许 Veycomm。"
-        }
         refreshHotKeys()
         if updates.automaticallyChecks { Task { await updates.check() } }
     }
@@ -67,9 +64,9 @@ final class ShortcutStore: ObservableObject {
     }
     private func translateSelection() async {
         guard translationSettings.isEnabled else { lastError = "请先在设置中启用一个翻译服务"; return }
-        let directText = selectedText()
-        let text: String?
-        if let directText { text = directText } else { text = await copiedSelection() }
+        // Reading AXSelectedText is not consistently supported by browsers and
+        // Electron apps. Copying the current selection is the reliable path.
+        let text = await copiedSelection()
         guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { lastError = "没有读取到选中的文本。请先选择文字后再触发快捷键。"; return }
         TranslationPanelPresenter.shared.show(text: text, settings: translationSettings)
     }
@@ -90,32 +87,6 @@ final class ShortcutStore: ObservableObject {
         board.clearContents()
         if !savedItems.isEmpty { board.writeObjects(savedItems) }
         return selected
-    }
-    private func selectedText() -> String? {
-        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-        guard AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary) else { return nil }
-        let system = AXUIElementCreateSystemWide()
-        var focused: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
-              let element = focused else { return nil }
-        return findSelectedText(in: element as! AXUIElement)
-    }
-    private func findSelectedText(in element: AXUIElement, depth: Int = 0) -> String? {
-        guard depth < 8 else { return nil }
-        var value: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &value) == .success,
-           let text = value as? String, !text.isEmpty { return text }
-        for attribute in [kAXFocusedUIElementAttribute, kAXChildrenAttribute, kAXVisibleChildrenAttribute] {
-            var childValue: CFTypeRef?
-            guard AXUIElementCopyAttributeValue(element, attribute as CFString, &childValue) == .success else { continue }
-            if let children = childValue as? [AXUIElement] {
-                for child in children { if let text = findSelectedText(in: child, depth: depth + 1) { return text } }
-            } else if let childValue, CFGetTypeID(childValue) == AXUIElementGetTypeID() {
-                let child = unsafeBitCast(childValue, to: AXUIElement.self)
-                if let text = findSelectedText(in: child, depth: depth + 1) { return text }
-            }
-        }
-        return nil
     }
     private func load() {
         guard let data = UserDefaults.standard.data(forKey: defaultsKey), let saved = try? JSONDecoder().decode([ShortcutItem].self, from: data) else { return }
@@ -184,7 +155,6 @@ private struct UserLaunchAgent {
 // Registration and the callback are serialized on that dispatcher.
 private final class GlobalHotKeyManager: @unchecked Sendable {
     var onHotKey: ((UUID) -> Void)?
-    var onAccessibilityRequired: (() -> Void)?
     private var refs: [EventHotKeyRef] = []
     private var ids: [UInt32: UUID] = [:]
     private var shortcuts: [Shortcut: UUID] = [:]
@@ -213,7 +183,6 @@ private final class GlobalHotKeyManager: @unchecked Sendable {
         refs.forEach { UnregisterEventHotKey($0) }; refs.removeAll(); ids.removeAll(); nextID = 1
         shortcuts = Dictionary(uniqueKeysWithValues: items.map { ($0.shortcut, $0.id) })
         if installEventTap() { return }
-        DispatchQueue.main.async { [weak self] in self?.onAccessibilityRequired?() }
         for item in items {
             let id = nextID; nextID += 1
             var ref: EventHotKeyRef?
@@ -226,9 +195,9 @@ private final class GlobalHotKeyManager: @unchecked Sendable {
 
     private func installEventTap() -> Bool {
         if eventTap != nil { return true }
-        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-        let options = [promptKey: true] as CFDictionary
-        guard AXIsProcessTrustedWithOptions(options) else { return false }
+        // Never show a system authorization dialog merely because Veycomm
+        // launched. It is disruptive and can report stale TCC state.
+        guard AXIsProcessTrusted() else { return false }
         let mask = CGEventMask(1) << CGEventType.keyDown.rawValue
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
