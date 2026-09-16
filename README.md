@@ -1,4 +1,4 @@
-# ShortcutShelf
+# Veycomm
 
 一个原生、轻量的 macOS 菜单栏快捷键工具。它把全局快捷键映射到应用、链接、脚本或文本输入，不使用 Electron，也没有网络请求或分析追踪。
 
@@ -12,7 +12,7 @@
 - 支持 macOS 登录时启动（macOS 13+）
 - 所有配置仅保存在本机 `UserDefaults`
 
-为覆盖已被其他应用占用的组合键（例如 `⌘D`），ShortcutShelf 会请求“辅助功能”权限；它只会拦截你已配置的组合键。未授权时仍使用标准系统热键注册。
+为覆盖已被其他应用占用的组合键（例如 `⌘D`），Veycomm 会请求“辅助功能”权限；它只会拦截你已配置的组合键。未授权时仍使用标准系统热键注册。
 
 “粘贴文本”会模拟一次 Command-V，因此 macOS 可能要求你在“系统设置 → 隐私与安全性 → 辅助功能”中授权本应用。
 
@@ -31,14 +31,14 @@ swift run
 ```sh
 chmod +x Scripts/make-app.sh
 Scripts/make-app.sh
-open dist/ShortcutShelf.app
+open dist/Veycomm.app
 ```
 
 创建供安装的 DMG（打开后将应用拖到“应用程序”文件夹）：
 
 ```sh
 Scripts/make-dmg.sh
-open dist/ShortcutShelf.dmg
+open dist/Veycomm.dmg
 ```
 
 在 Xcode 中可用 `File → Open…` 打开 `Package.swift`。发布前请用自己的 Developer ID 证书签名并公证；脚本只使用本地 ad-hoc 签名。
@@ -47,7 +47,7 @@ open dist/ShortcutShelf.dmg
 
 ## 发布
 
-推送 `v*` 格式的 Git tag（例如 `v0.1.0`）会运行 GitHub Actions，创建 `ShortcutShelf.dmg` 并作为 GitHub Release 附件发布。
+推送 `v*` 格式的 Git tag（例如 `v0.1.0`）会运行 GitHub Actions，创建 `Veycomm.dmg` 并作为 GitHub Release 附件发布。
 
 ## 快捷键录制
 

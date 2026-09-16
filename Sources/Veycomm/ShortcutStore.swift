@@ -21,7 +21,7 @@ final class ShortcutStore: ObservableObject {
             self.perform(item)
         }
         manager.onAccessibilityRequired = { [weak self] in
-            self?.lastError = "若要覆盖已被其他应用占用的快捷键，请在“系统设置 → 隐私与安全性 → 辅助功能”中允许 ShortcutShelf。"
+            self?.lastError = "若要覆盖已被其他应用占用的快捷键，请在“系统设置 → 隐私与安全性 → 辅助功能”中允许 Veycomm。"
         }
         refreshHotKeys()
     }
@@ -92,7 +92,7 @@ final class ShortcutStore: ObservableObject {
 /// A per-user fallback for development and ad-hoc-signed builds. Production,
 /// Developer-ID-signed builds use SMAppService above.
 private struct UserLaunchAgent {
-    private let label = "com.shortcutshelf.app"
+    private let label = "com.veycomm.app"
     private var fileURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/LaunchAgents", isDirectory: true)

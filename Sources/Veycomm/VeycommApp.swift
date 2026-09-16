@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct ShortcutShelfApp: App {
+struct VeycommApp: App {
     @StateObject private var store = ShortcutStore()
 
     init() {
@@ -10,7 +10,7 @@ struct ShortcutShelfApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("ShortcutShelf", systemImage: "command") {
+        MenuBarExtra("Veycomm", systemImage: "command") {
             MenuContent()
                 .environmentObject(store)
         }
@@ -30,7 +30,7 @@ private struct MenuContent: View {
         Button("设置…") { SettingsWindowPresenter.shared.show(store: store) }
             .keyboardShortcut(",")
         Divider()
-        Button("退出 ShortcutShelf") { NSApplication.shared.terminate(nil) }
+        Button("退出 Veycomm") { NSApplication.shared.terminate(nil) }
             .keyboardShortcut("q")
     }
 }
@@ -48,7 +48,7 @@ private final class SettingsWindowPresenter {
         }
         let controller = NSHostingController(rootView: SettingsView().environmentObject(store))
         let window = NSWindow(contentViewController: controller)
-        window.title = "ShortcutShelf 设置"
+        window.title = "Veycomm 设置"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.setContentSize(NSSize(width: 720, height: 440))
         window.center()

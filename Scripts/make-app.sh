@@ -4,7 +4,7 @@ set -euo pipefail
 # Creates a locally runnable, ad-hoc-signed app bundle in ./dist.
 # Do not use this output for distribution; use a Developer ID certificate and notarization instead.
 project_dir=${0:A:h:h}
-output_dir="$project_dir/dist/ShortcutShelf.app"
+output_dir="$project_dir/dist/Veycomm.app"
 developer_dir=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}
 
 if [[ ! -d "$developer_dir" ]]; then
@@ -31,6 +31,6 @@ fi
 mkdir -p "$output_dir/Contents/MacOS" "$output_dir/Contents/Resources"
 cp App/Info.plist "$output_dir/Contents/Info.plist"
 cp App/Assets/AppIcon.icns "$output_dir/Contents/Resources/AppIcon.icns"
-cp "$binary_dir/ShortcutShelf" "$output_dir/Contents/MacOS/ShortcutShelf"
+cp "$binary_dir/Veycomm" "$output_dir/Contents/MacOS/Veycomm"
 codesign --force --sign - "$output_dir"
 print "Created $output_dir"

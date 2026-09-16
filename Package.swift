@@ -2,8 +2,8 @@
 import PackageDescription
 
 let package = Package(
-    name: "ShortcutShelf",
+    name: "Veycomm",
     platforms: [.macOS(.v13)],
-    products: [.executable(name: "ShortcutShelf", targets: ["ShortcutShelf"])],
-    targets: [.executableTarget(name: "ShortcutShelf")]
+    products: [.executable(name: "Veycomm", targets: ["Veycomm"])],
+    targets: [.executableTarget(name: "Veycomm")]
 )

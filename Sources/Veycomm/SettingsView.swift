@@ -34,7 +34,7 @@ struct SettingsView: View {
         }
         .frame(minWidth: 720, minHeight: 440)
         .sheet(isPresented: $showingEditor) { ShortcutEditor(item: $draft) { saved in store.save(saved); selection = saved.id } }
-        .alert("ShortcutShelf", isPresented: Binding(get: { store.lastError != nil }, set: { if !$0 { store.lastError = nil } })) { Button("好", role: .cancel) {} } message: { Text(store.lastError ?? "") }
+        .alert("Veycomm", isPresented: Binding(get: { store.lastError != nil }, set: { if !$0 { store.lastError = nil } })) { Button("好", role: .cancel) {} } message: { Text(store.lastError ?? "") }
         .alert("登录启动", isPresented: Binding(get: { store.statusMessage != nil }, set: { if !$0 { store.statusMessage = nil } })) { Button("好", role: .cancel) {} } message: { Text(store.statusMessage ?? "") }
     }
 }
