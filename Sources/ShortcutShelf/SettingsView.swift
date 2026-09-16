@@ -75,12 +75,12 @@ private struct ShortcutEditor: View {
         switch item.action {
         case .application:
             HStack {
-                TextField(item.action.placeholder, text: $item.payload)
+                TextField("", text: $item.payload, prompt: Text(item.action.placeholder))
                 Button("选择应用…", action: chooseApplication)
             }
         case .url:
             HStack {
-                TextField(item.action.placeholder, text: $item.payload)
+                TextField("", text: $item.payload, prompt: Text(item.action.placeholder))
                 Button("选择文件…", action: chooseFile)
             }
         case .shell, .text:
