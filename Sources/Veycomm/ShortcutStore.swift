@@ -71,13 +71,30 @@ final class ShortcutStore: ObservableObject {
         TranslationPanelPresenter.shared.show(text: text, settings: translationSettings)
     }
     private func selectedText() -> String? {
+        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        guard AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary) else { return nil }
         let system = AXUIElementCreateSystemWide()
         var focused: CFTypeRef?
         guard AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
               let element = focused else { return nil }
+        return findSelectedText(in: element as! AXUIElement)
+    }
+    private func findSelectedText(in element: AXUIElement, depth: Int = 0) -> String? {
+        guard depth < 8 else { return nil }
         var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element as! AXUIElement, kAXSelectedTextAttribute as CFString, &value) == .success else { return nil }
-        return value as? String
+        if AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &value) == .success,
+           let text = value as? String, !text.isEmpty { return text }
+        for attribute in [kAXFocusedUIElementAttribute, kAXChildrenAttribute, kAXVisibleChildrenAttribute] {
+            var childValue: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(element, attribute as CFString, &childValue) == .success else { continue }
+            if let children = childValue as? [AXUIElement] {
+                for child in children { if let text = findSelectedText(in: child, depth: depth + 1) { return text } }
+            } else if let childValue, CFGetTypeID(childValue) == AXUIElementGetTypeID() {
+                let child = unsafeBitCast(childValue, to: AXUIElement.self)
+                if let text = findSelectedText(in: child, depth: depth + 1) { return text }
+            }
+        }
+        return nil
     }
     private func load() {
         guard let data = UserDefaults.standard.data(forKey: defaultsKey), let saved = try? JSONDecoder().decode([ShortcutItem].self, from: data) else { return }
