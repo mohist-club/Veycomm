@@ -76,13 +76,17 @@ final class ShortcutStore: ObservableObject {
     private func copiedSelection() async -> String? {
         let board = NSPasteboard.general
         let savedItems = board.pasteboardItems ?? []
+        let initialChangeCount = board.changeCount
         let source = CGEventSource(stateID: .hidSystemState)
         let down = CGEvent(keyboardEventSource: source, virtualKey: 8, keyDown: true)
         let up = CGEvent(keyboardEventSource: source, virtualKey: 8, keyDown: false)
         down?.flags = .maskCommand; up?.flags = .maskCommand
         down?.post(tap: .cghidEventTap); up?.post(tap: .cghidEventTap)
-        try? await Task.sleep(for: .milliseconds(120))
-        let selected = board.string(forType: .string)
+        for _ in 0..<16 {
+            try? await Task.sleep(for: .milliseconds(50))
+            if board.changeCount != initialChangeCount { break }
+        }
+        let selected = board.changeCount != initialChangeCount ? board.string(forType: .string) : nil
         board.clearContents()
         if !savedItems.isEmpty { board.writeObjects(savedItems) }
         return selected
