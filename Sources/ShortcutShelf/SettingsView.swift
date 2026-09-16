@@ -63,7 +63,7 @@ private struct ShortcutEditor: View {
                 TextField("名称", text: $item.name)
                 Picker("动作", selection: $item.action) { ForEach(ShortcutAction.allCases) { Text($0.title).tag($0) } }
                 payloadField
-                HStack { Text("组合键"); Spacer(); KeyRecorder(shortcut: $item.shortcut, isRecording: $isRecording) }
+                HStack { Text("组合键"); Spacer(); KeyRecorder(shortcut: $item.shortcut, isRecording: $isRecording, onRecordingState: store.setHotKeyRecording) }
                 Toggle("已启用", isOn: $item.isEnabled)
             }
             if let warning { Label(warning, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }
@@ -112,7 +112,21 @@ private struct ShortcutEditor: View {
 private struct KeyRecorder: NSViewRepresentable {
     @Binding var shortcut: Shortcut
     @Binding var isRecording: Bool
-    func makeNSView(context: Context) -> RecorderButton { let button = RecorderButton(); button.onRecord = { code, modifiers in shortcut = Shortcut(keyCode: code, modifiers: modifiers); isRecording = false }; button.onState = { isRecording = $0 }; button.shortcut = shortcut; return button }
+    let onRecordingState: (Bool) -> Void
+    func makeNSView(context: Context) -> RecorderButton {
+        let button = RecorderButton()
+        button.onRecord = { code, modifiers in
+            shortcut = Shortcut(keyCode: code, modifiers: modifiers)
+            isRecording = false
+            onRecordingState(false)
+        }
+        button.onState = { active in
+            isRecording = active
+            onRecordingState(active)
+        }
+        button.shortcut = shortcut
+        return button
+    }
     func updateNSView(_ view: RecorderButton, context: Context) { view.shortcut = shortcut; view.isRecording = isRecording }
 }
 

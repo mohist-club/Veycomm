@@ -34,6 +34,7 @@ final class ShortcutStore: ObservableObject {
     func conflict(for item: ShortcutItem) -> ShortcutItem? {
         items.first { $0.id != item.id && $0.isEnabled && $0.shortcut == item.shortcut }
     }
+    func setHotKeyRecording(_ isRecording: Bool) { manager.isSuspended = isRecording }
     func perform(_ item: ShortcutItem) {
         switch item.action {
         case .application:
@@ -134,6 +135,7 @@ private final class GlobalHotKeyManager: @unchecked Sendable {
     private var eventTap: CFMachPort?
     private var eventTapSource: CFRunLoopSource?
     private var nextID: UInt32 = 1
+    var isSuspended = false
 
     init() {
         let spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
@@ -183,6 +185,7 @@ private final class GlobalHotKeyManager: @unchecked Sendable {
                     if let tap = manager.eventTap { CGEvent.tapEnable(tap: tap, enable: true) }
                     return Unmanaged.passUnretained(event)
                 }
+                if manager.isSuspended { return Unmanaged.passUnretained(event) }
                 let shortcut = Shortcut(
                     keyCode: UInt32(event.getIntegerValueField(.keyboardEventKeycode)),
                     modifiers: carbonModifiers(from: event.flags)
