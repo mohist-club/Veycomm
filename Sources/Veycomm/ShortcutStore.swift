@@ -67,8 +67,25 @@ final class ShortcutStore: ObservableObject {
     }
     private func translateSelection() async {
         guard translationSettings.isEnabled else { lastError = "请先在设置中启用一个翻译服务"; return }
-        guard let text = selectedText(), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { lastError = "没有读取到选中的文本。请先选择文字，并在“辅助功能”中允许 Veycomm。"; return }
+        let directText = selectedText()
+        let text: String?
+        if let directText { text = directText } else { text = await copiedSelection() }
+        guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { lastError = "没有读取到选中的文本。请先选择文字后再触发快捷键。"; return }
         TranslationPanelPresenter.shared.show(text: text, settings: translationSettings)
+    }
+    private func copiedSelection() async -> String? {
+        let board = NSPasteboard.general
+        let savedItems = board.pasteboardItems ?? []
+        let source = CGEventSource(stateID: .hidSystemState)
+        let down = CGEvent(keyboardEventSource: source, virtualKey: 8, keyDown: true)
+        let up = CGEvent(keyboardEventSource: source, virtualKey: 8, keyDown: false)
+        down?.flags = .maskCommand; up?.flags = .maskCommand
+        down?.post(tap: .cghidEventTap); up?.post(tap: .cghidEventTap)
+        try? await Task.sleep(for: .milliseconds(120))
+        let selected = board.string(forType: .string)
+        board.clearContents()
+        if !savedItems.isEmpty { board.writeObjects(savedItems) }
+        return selected
     }
     private func selectedText() -> String? {
         let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String

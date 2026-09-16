@@ -147,6 +147,7 @@ private struct TranslationSettingsEditor: View {
                 if settings.provider == .google { TextField("Google Project ID（v3 时需要）", text: $settings.googleProjectID) }
             }
             Text("一次只能启用一个服务。密钥只保存在本机 Keychain，不会进入配置文件。").font(.footnote).foregroundStyle(.secondary)
+            Text("划词优先使用辅助功能读取；不支持该能力的应用会临时复制当前选区并立即恢复剪贴板，绝不使用旧剪贴板文本。").font(.footnote).foregroundStyle(.secondary)
             if let message { Text(message).foregroundStyle(.red) }
             HStack { Spacer(); Button("完成") { do { try settings.saveAPIKey(key); dismiss() } catch { message = "无法保存密钥" } }.keyboardShortcut(.defaultAction) }
         }.padding().frame(width: 480)
