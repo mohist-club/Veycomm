@@ -30,6 +30,9 @@ fi
 
 mkdir -p "$output_dir/Contents/MacOS" "$output_dir/Contents/Resources"
 cp App/Info.plist "$output_dir/Contents/Info.plist"
+release_version=${VERSION:-$(git describe --tags --always 2>/dev/null | sed 's/^v//')}
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $release_version" "$output_dir/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $release_version" "$output_dir/Contents/Info.plist"
 cp App/Assets/AppIcon.icns "$output_dir/Contents/Resources/AppIcon.icns"
 cp "$binary_dir/Veycomm" "$output_dir/Contents/MacOS/Veycomm"
 codesign --force --sign - "$output_dir"

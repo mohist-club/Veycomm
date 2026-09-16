@@ -6,6 +6,7 @@ struct SettingsView: View {
     @State private var selection: UUID?
     @State private var showingEditor = false
     @State private var showingTranslationSettings = false
+    @State private var showingUpdateSettings = false
     @State private var draft = ShortcutItem.example
 
     var body: some View {
@@ -20,6 +21,7 @@ struct SettingsView: View {
             .toolbar {
                 Button { draft = ShortcutItem.example; showingEditor = true } label: { Image(systemName: "plus") }
                 Button { showingTranslationSettings = true } label: { Image(systemName: "globe") }
+                Button { showingUpdateSettings = true } label: { Image(systemName: "arrow.triangle.2.circlepath") }
                 Button { if let selected = store.items.first(where: { $0.id == selection }) { store.delete(selected); selection = nil } } label: { Image(systemName: "minus") }
                     .disabled(selection == nil)
             }
@@ -37,8 +39,23 @@ struct SettingsView: View {
         .frame(minWidth: 720, minHeight: 440)
         .sheet(isPresented: $showingEditor) { ShortcutEditor(item: $draft) { saved in store.save(saved); selection = saved.id } }
         .sheet(isPresented: $showingTranslationSettings) { TranslationSettingsEditor(settings: store.translationSettings) }
+        .sheet(isPresented: $showingUpdateSettings) { UpdateSettingsEditor(checker: store.updates) }
         .alert("Veycomm", isPresented: Binding(get: { store.lastError != nil }, set: { if !$0 { store.lastError = nil } })) { Button("好", role: .cancel) {} } message: { Text(store.lastError ?? "") }
         .alert("登录启动", isPresented: Binding(get: { store.statusMessage != nil }, set: { if !$0 { store.statusMessage = nil } })) { Button("好", role: .cancel) {} } message: { Text(store.statusMessage ?? "") }
+    }
+}
+
+private struct UpdateSettingsEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var checker: UpdateChecker
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("软件更新").font(.title2.bold())
+            Toggle("启动时自动检查更新", isOn: $checker.automaticallyChecks)
+            Group { switch checker.state { case .idle: Text("尚未检查"); case .checking: ProgressView("正在检查…"); case .upToDate: Text("已是最新版本"); case .available(let version, _): Text("发现 Veycomm \(version)"); case .failed(let message): Text(message).foregroundStyle(.red) } }
+            HStack { Button("立即检查") { Task { await checker.check() } }; if case .available = checker.state { Button("下载更新", action: checker.download) }; Spacer(); Button("完成") { dismiss() } }
+            Text("更新来自 GitHub Release。下载后将应用拖到“应用程序”文件夹以完成替换。").font(.footnote).foregroundStyle(.secondary)
+        }.padding().frame(width: 430)
     }
 }
 

@@ -10,6 +10,7 @@ final class ShortcutStore: ObservableObject {
     @Published var lastError: String?
     @Published var statusMessage: String?
     let translationSettings = TranslationSettings()
+    let updates = UpdateChecker()
     private let defaultsKey = "shortcut-items"
     private let manager = GlobalHotKeyManager()
     private let fallbackLoginAgent = UserLaunchAgent()
@@ -25,6 +26,7 @@ final class ShortcutStore: ObservableObject {
             self?.lastError = "若要覆盖已被其他应用占用的快捷键，请在“系统设置 → 隐私与安全性 → 辅助功能”中允许 Veycomm。"
         }
         refreshHotKeys()
+        if updates.automaticallyChecks { Task { await updates.check() } }
     }
 
     func save(_ item: ShortcutItem) {

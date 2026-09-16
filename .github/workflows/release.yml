@@ -16,7 +16,7 @@ jobs:
       - name: Build app bundle
         run: |
           chmod +x Scripts/make-app.sh Scripts/make-dmg.sh
-          Scripts/make-app.sh
+          VERSION="${GITHUB_REF_NAME#v}" Scripts/make-app.sh
       - name: Create DMG
         run: Scripts/make-dmg.sh
       - name: Publish GitHub release
