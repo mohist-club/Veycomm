@@ -62,7 +62,7 @@ private struct ShortcutEditor: View {
             Form {
                 TextField("名称", text: $item.name)
                 Picker("动作", selection: $item.action) { ForEach(ShortcutAction.allCases) { Text($0.title).tag($0) } }
-                TextField(item.action.placeholder, text: $item.payload, axis: .vertical).lineLimit(2...4)
+                payloadField
                 HStack { Text("组合键"); Spacer(); KeyRecorder(shortcut: $item.shortcut, isRecording: $isRecording) }
                 Toggle("已启用", isOn: $item.isEnabled)
             }
@@ -70,7 +70,43 @@ private struct ShortcutEditor: View {
             HStack { Spacer(); Button("取消") { dismiss() }; Button("保存") { save() }.keyboardShortcut(.defaultAction).disabled(item.name.trimmingCharacters(in: .whitespaces).isEmpty || item.payload.isEmpty) }
         }.padding().frame(width: 500)
     }
+    @ViewBuilder
+    private var payloadField: some View {
+        switch item.action {
+        case .application:
+            HStack {
+                TextField(item.action.placeholder, text: $item.payload)
+                Button("选择应用…", action: chooseApplication)
+            }
+        case .url:
+            HStack {
+                TextField(item.action.placeholder, text: $item.payload)
+                Button("选择文件…", action: chooseFile)
+            }
+        case .shell, .text:
+            TextField(item.action.placeholder, text: $item.payload, axis: .vertical).lineLimit(2...4)
+        }
+    }
     private func save() { if let conflict = store.conflict(for: item) { warning = "与“\(conflict.name)”使用相同快捷键"; return }; onSave(item); dismiss() }
+    private func chooseApplication() {
+        let panel = NSOpenPanel()
+        panel.title = "选择要打开的应用"
+        panel.message = "选择一个 .app 应用程序"
+        panel.allowedContentTypes = [.applicationBundle]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        if panel.runModal() == .OK, let url = panel.url {
+            item.payload = url.path
+            if item.name == ShortcutItem.example.name { item.name = "打开 \(url.deletingPathExtension().lastPathComponent)" }
+        }
+    }
+    private func chooseFile() {
+        let panel = NSOpenPanel()
+        panel.title = "选择文件"
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        if panel.runModal() == .OK, let url = panel.url { item.payload = url.path }
+    }
 }
 
 private struct KeyRecorder: NSViewRepresentable {

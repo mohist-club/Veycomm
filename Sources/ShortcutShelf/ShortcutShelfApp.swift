@@ -16,10 +16,6 @@ struct ShortcutShelfApp: App {
         }
         .menuBarExtraStyle(.menu)
 
-        Settings {
-            SettingsView()
-                .environmentObject(store)
-        }
     }
 }
 
@@ -31,12 +27,34 @@ private struct MenuContent: View {
             Button(item.name) { store.perform(item) }
         }
         if !store.items.isEmpty { Divider() }
-        Button("设置…") {
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-        }
+        Button("设置…") { SettingsWindowPresenter.shared.show(store: store) }
             .keyboardShortcut(",")
         Divider()
         Button("退出 ShortcutShelf") { NSApplication.shared.terminate(nil) }
             .keyboardShortcut("q")
+    }
+}
+
+@MainActor
+private final class SettingsWindowPresenter {
+    static let shared = SettingsWindowPresenter()
+    private var window: NSWindow?
+
+    func show(store: ShortcutStore) {
+        if let window {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        let controller = NSHostingController(rootView: SettingsView().environmentObject(store))
+        let window = NSWindow(contentViewController: controller)
+        window.title = "ShortcutShelf 设置"
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.setContentSize(NSSize(width: 720, height: 440))
+        window.center()
+        window.isReleasedWhenClosed = false
+        self.window = window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 }
