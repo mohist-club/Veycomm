@@ -45,9 +45,25 @@ open dist/Veycomm.dmg
 
 > GitHub Release 中的本地构建 DMG 没有 Developer ID 公证。首次运行时，macOS 可能要求你在“系统设置 → 隐私与安全性”中确认打开。维护者发布正式版本前应配置 Developer ID 签名与 Apple 公证。
 
-## 发布
+## 本机构建、验证与发布
 
-推送 `v*` 格式的 Git tag（例如 `v0.1.0`）会运行 GitHub Actions，创建 `Veycomm.dmg` 并作为 GitHub Release 附件发布。
+GitHub Actions 只检查源代码，**不会**构建、签名或上传安装包。这样 GitHub Release 中的 DMG 永远就是维护者在本机实际测试过的那一份文件。
+
+每次发布按此顺序操作：
+
+```sh
+# 1. 本机构建一个指定版本
+VERSION=0.4.0 Scripts/make-app.sh
+Scripts/make-dmg.sh
+
+# 2. 打开 dist/Veycomm.dmg，拖入“应用程序”，启动并手动验证：
+#    授权、全局快捷键、划词翻译、设置窗口、登录启动。
+
+# 3. 仅在验证通过后，上传当前这个 DMG（不会重新构建）
+Scripts/publish-local-release.sh 0.4.0
+```
+
+发布脚本会先校验 DMG、要求代码已提交，然后创建 tag 并上传 `dist/Veycomm.dmg`。后续更新仍建议使用 Developer ID 签名与公证，以让 macOS 的权限和信任跨版本稳定保留。
 
 ## 快捷键录制
 
