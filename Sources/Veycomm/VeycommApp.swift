@@ -16,6 +16,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        // Services receive the selected text directly from macOS. This is the
+        // reliable path when an app deliberately hides its AX selection.
+        NSRegisterServicesProvider(self, "Veycomm")
         statusItem.button?.image = NSImage(systemSymbolName: "command", accessibilityDescription: "Veycomm")
         statusItem.menu = NSMenu()
         statusItem.menu?.delegate = self
@@ -52,6 +55,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func showSettings() { SettingsWindowPresenter.shared.show(store: store) }
     @objc private func quit() { NSApp.terminate(nil) }
+
+    @objc(translateSelection:userData:error:)
+    func translateSelection(_ pasteboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
+        guard let text = pasteboard.string(forType: .string), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            error.pointee = "没有收到选中的文本。" as NSString
+            return
+        }
+        guard store.translationSettings.isEnabled else {
+            error.pointee = "请先在 Veycomm 设置中启用翻译服务。" as NSString
+            return
+        }
+        TranslationPanelPresenter.shared.show(text: text, settings: store.translationSettings)
+    }
 }
 
 @MainActor
