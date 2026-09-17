@@ -20,6 +20,10 @@ struct SettingsView: View {
             .navigationTitle("快捷键")
             .toolbar {
                 Button { draft = ShortcutItem.example; showingEditor = true } label: { Image(systemName: "plus") }
+                Button { store.requestAccessibilityPermission() } label: {
+                    Image(systemName: store.accessibilityGranted ? "checkmark.shield.fill" : "shield")
+                }
+                .help(store.accessibilityGranted ? "辅助功能已授权" : "授权辅助功能")
                 Button { showingTranslationSettings = true } label: { Image(systemName: "globe") }
                 Button { showingUpdateSettings = true } label: { Image(systemName: "arrow.triangle.2.circlepath") }
                 Button { if let selected = store.items.first(where: { $0.id == selection }) { store.delete(selected); selection = nil } } label: { Image(systemName: "minus") }
@@ -147,7 +151,7 @@ private struct TranslationSettingsEditor: View {
                 if settings.provider == .google { TextField("Google Project ID（v3 时需要）", text: $settings.googleProjectID) }
             }
             Text("一次只能启用一个服务。密钥只保存在本机 Keychain，不会进入配置文件。").font(.footnote).foregroundStyle(.secondary)
-            Text("划词优先使用辅助功能读取；不支持该能力的应用会临时复制当前选区并立即恢复剪贴板，绝不使用旧剪贴板文本。").font(.footnote).foregroundStyle(.secondary)
+            Text("划词翻译需要在 Veycomm 设置中授予辅助功能权限。授权后，快捷键会直接读取当前选中文字。").font(.footnote).foregroundStyle(.secondary)
             if let message { Text(message).foregroundStyle(.red) }
             HStack { Spacer(); Button("完成") { do { try settings.saveAPIKey(key); dismiss() } catch { message = "无法保存密钥" } }.keyboardShortcut(.defaultAction) }
         }.padding().frame(width: 480)

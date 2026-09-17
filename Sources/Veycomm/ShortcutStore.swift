@@ -7,6 +7,7 @@ import ApplicationServices
 final class ShortcutStore: ObservableObject {
     @Published private(set) var items: [ShortcutItem] = []
     @Published var launchAtLogin = false { didSet { updateLaunchAtLogin() } }
+    @Published private(set) var accessibilityGranted = false
     @Published var lastError: String?
     @Published var statusMessage: String?
     let translationSettings = TranslationSettings()
@@ -14,16 +15,38 @@ final class ShortcutStore: ObservableObject {
     private let defaultsKey = "shortcut-items"
     private let manager = GlobalHotKeyManager()
     private let fallbackLoginAgent = UserLaunchAgent()
+    private var permissionTimer: Timer?
 
     init() {
         load()
+        accessibilityGranted = AXIsProcessTrusted()
         launchAtLogin = SMAppService.mainApp.status == .enabled || fallbackLoginAgent.isInstalled
         manager.onHotKey = { [weak self] id in
             guard let self, let item = self.items.first(where: { $0.id == id && $0.isEnabled }) else { return }
             self.perform(item)
         }
         refreshHotKeys()
+        permissionTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.refreshAccessibilityState() }
+        }
         if updates.automaticallyChecks { Task { await updates.check() } }
+    }
+    deinit { permissionTimer?.invalidate() }
+
+    /// Called only from an explicit control inside Veycomm. macOS owns the
+    /// actual consent sheet; Veycomm merely requests and observes it.
+    func requestAccessibilityPermission() {
+        let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        _ = AXIsProcessTrustedWithOptions([key: true] as CFDictionary)
+        refreshAccessibilityState()
+    }
+
+    private func refreshAccessibilityState() {
+        let granted = AXIsProcessTrusted()
+        guard granted != accessibilityGranted else { return }
+        accessibilityGranted = granted
+        refreshHotKeys()
+        if granted { statusMessage = "辅助功能授权已生效，快捷键现在可直接读取选中文字。" }
     }
 
     func save(_ item: ShortcutItem) {
@@ -64,6 +87,11 @@ final class ShortcutStore: ObservableObject {
     }
     private func translateSelection() async {
         guard translationSettings.isEnabled else { lastError = "请先在设置中启用一个翻译服务"; return }
+        guard accessibilityGranted else {
+            requestAccessibilityPermission()
+            lastError = "需要辅助功能授权才能读取划选文字。请在系统弹出的页面中允许 Veycomm，然后回到此处。"
+            return
+        }
         // Native text fields usually expose this immediately. Browsers and
         // Electron apps often do not, so they fall back to a temporary Cmd-C.
         let directText = selectedTextFromAccessibility()
