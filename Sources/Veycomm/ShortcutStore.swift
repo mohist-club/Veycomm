@@ -64,9 +64,15 @@ final class ShortcutStore: ObservableObject {
     }
     private func translateSelection() async {
         guard translationSettings.isEnabled else { lastError = "请先在设置中启用一个翻译服务"; return }
-        // Reading AXSelectedText is not consistently supported by browsers and
-        // Electron apps. Copying the current selection is the reliable path.
-        let text = await copiedSelection()
+        // Native text fields usually expose this immediately. Browsers and
+        // Electron apps often do not, so they fall back to a temporary Cmd-C.
+        let directText = selectedTextFromAccessibility()
+        let text: String?
+        if let directText, !directText.isEmpty {
+            text = directText
+        } else {
+            text = await copiedSelection()
+        }
         guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { lastError = "没有读取到选中的文本。请先选择文字后再触发快捷键。"; return }
         TranslationPanelPresenter.shared.show(text: text, settings: translationSettings)
     }
@@ -74,7 +80,7 @@ final class ShortcutStore: ObservableObject {
         let board = NSPasteboard.general
         let savedItems = board.pasteboardItems ?? []
         let initialChangeCount = board.changeCount
-        let source = CGEventSource(stateID: .hidSystemState)
+        let source = CGEventSource(stateID: .combinedSessionState)
         let down = CGEvent(keyboardEventSource: source, virtualKey: 8, keyDown: true)
         let up = CGEvent(keyboardEventSource: source, virtualKey: 8, keyDown: false)
         down?.flags = .maskCommand; up?.flags = .maskCommand
@@ -87,6 +93,22 @@ final class ShortcutStore: ObservableObject {
         board.clearContents()
         if !savedItems.isEmpty { board.writeObjects(savedItems) }
         return selected
+    }
+
+    /// This is deliberately a shallow read: it never walks arbitrary AX child
+    /// objects and never requests permission, so it cannot trigger an alert or
+    /// hit the unsafe CoreFoundation bridging that caused earlier instability.
+    private func selectedTextFromAccessibility() -> String? {
+        guard AXIsProcessTrusted() else { return nil }
+        let system = AXUIElementCreateSystemWide()
+        var focusedValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &focusedValue) == .success,
+              let focusedValue,
+              CFGetTypeID(focusedValue) == AXUIElementGetTypeID() else { return nil }
+        let focused = unsafeBitCast(focusedValue, to: AXUIElement.self)
+        var textValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(focused, kAXSelectedTextAttribute as CFString, &textValue) == .success else { return nil }
+        return textValue as? String
     }
     private func load() {
         guard let data = UserDefaults.standard.data(forKey: defaultsKey), let saved = try? JSONDecoder().decode([ShortcutItem].self, from: data) else { return }
